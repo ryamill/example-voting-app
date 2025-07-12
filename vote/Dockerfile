@@ -1,5 +1,5 @@
 # base defines a base stage that uses the official python runtime base image
-FROM cgr.dev/chainguard/python:latest-dev
+FROM cgr.dev/chainguard/python:latest-dev AS base
 
 # Add curl for healthcheck
 RUN apt-get update && \
