@@ -1,32 +1,62 @@
-# base defines a base stage that uses the official python runtime base image
-FROM cgr.dev/chainguard/python:latest-dev AS base
+# --- Stage 1: Builder ---
+# This stage uses the 'latest-dev' image because it contains a shell (apk)
+# and development tools needed to install dependencies like pip.
+FROM cgr.dev/chainguard/python:latest-dev AS builder
 
-# Add curl for healthcheck
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl && \
-    rm -rf /var/lib/apt/lists/*
-
-# Set the application directory
+# Set the application directory for the build process
 WORKDIR /usr/local/app
 
-# Install our requirements.txt
-COPY requirements.txt ./requirements.txt
+# Install build-time dependencies and your application's requirements.
+# Use 'apk' for system packages (like curl, if truly needed for a script here)
+# and 'pip' for Python packages.
+RUN apk update && \
+    apk add --no-cache curl && \
+    rm -rf /var/cache/apk/*
+
+# Copy requirements and install them
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# dev defines a stage for development, where it'll watch for filesystem changes
-FROM base AS dev
-RUN pip install watchdog
-ENV FLASK_ENV=development
-CMD ["python", "app.py"]
-
-# final defines the stage that will bundle the application for production
-FROM base AS final
-
-# Copy our code from the current folder to the working directory inside the container
+# Copy the rest of your application code to the builder stage
 COPY . .
+
+# --- Stage 2: Final Production Image ---
+# This stage uses the *truly minimal*, shell-less Chainguard Python runtime.
+# It only copies the essential artifacts from the 'builder' stage.
+FROM cgr.dev/chainguard/python:latest AS final_production
+
+# Set the application directory in the final stage
+WORKDIR /usr/local/app
+
+# Copy only the installed Python packages from the builder stage.
+# The path for site-packages in Chainguard Python images is typically /usr/lib/pythonX.Y/site-packages.
+# Adjust the 'python3.12' part if your Python version is different.
+COPY --from=builder /usr/lib/python3.12/site-packages /usr/lib/python3.12/site-packages
+
+# Copy your application source code from the builder stage
+COPY --from=builder /usr/local/app .
 
 # Make port 80 available for links and/or publish
 EXPOSE 80
 
+# Healthcheck Consideration:
+# For production, it's best to avoid tools like 'curl' inside the final image
+# to keep it minimal. If you need a healthcheck, consider:
+# 1. Using a Python-based healthcheck (as the Python runtime is available).
+#    Example (add this HEALTHCHECK line if needed, adapt to your actual health endpoint):
+#    HEALTHCHECK --interval=30s --timeout=3s \
+#      CMD python -c "import http.client; try: conn = http.client.HTTPConnection('localhost', 80); conn.request('GET', '/healthz'); r = conn.getresponse(); exit(0 if r.status == 200 else 1); except Exception: exit(1)"
+# 2. Implementing health checks externally (e.g., in your Docker Compose file
+#    or Kubernetes deployment definition), which is often more robust for minimal images.
+
 # Define our command to be run when launching the container
 CMD ["gunicorn", "app:app", "-b", "0.0.0.0:80", "--log-file", "-", "--access-logfile", "-", "--workers", "4", "--keep-alive", "0"]
+
+# --- Stage 3 (Optional): Development Image ---
+# If you still want a 'dev' image for local development, it should be based
+# on the 'builder' stage (or a specific dev image) but is NOT used as a base
+# for your 'final_production' image. This keeps your dev environment separate.
+FROM builder AS dev
+RUN pip install watchdog
+ENV FLASK_ENV=development
+CMD ["python", "app.py"]
