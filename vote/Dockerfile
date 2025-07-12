@@ -58,4 +58,5 @@ CMD ["gunicorn", "app:app", "-b", "0.0.0.0:80", "--log-file", "-", "--access-log
 FROM builder AS dev
 RUN pip install watchdog
 ENV FLASK_ENV=development
-CMD ["sh", "-c", "python app.py"]
+ENTRYPOINT ["sh"]
+CMD ["-c", "python app.py"]
