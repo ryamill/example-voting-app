@@ -6,12 +6,21 @@ FROM cgr.dev/chainguard/python:latest-dev AS builder
 # Set the application directory for the build process
 WORKDIR /usr/local/app
 
+# Switch to root user to install system packages with apk
+USER root
 # Install build-time dependencies and your application's requirements.
 # Use 'apk' for system packages (like curl, if truly needed for a script here)
 # and 'pip' for Python packages.
 RUN apk update && \
     apk add --no-cache curl && \
     rm -rf /var/cache/apk/*
+
+# It's good practice to switch back to a non-root user if one exists in the base image
+# and subsequent commands don't require root. For Chainguard images, a common
+# non-root user or UID might be 'nonroot' or '65532'. However, for simplicity
+# in this builder stage, and since pip install often works as root, we can proceed
+# without explicitly changing back here. The important part is that the final image
+# will inherently run as a non-root user unless you explicitly set it to root.
 
 # Copy requirements and install them
 COPY requirements.txt .
