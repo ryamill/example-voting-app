@@ -1,71 +1,107 @@
-# --- Stage 1: Builder ---
-# This stage uses the 'latest-dev' image because it contains a shell (apk)
-# and development tools needed to install dependencies like pip.
-FROM cgr.dev/chainguard/python:latest-dev AS builder
+# version is now using "compose spec"
+# v2 and v3 are now combined!
+# docker-compose v1.27+ required
 
-# Set the application directory for the build process
-WORKDIR /usr/local/app
+services:
+  vote:
+    build:
+      context: ./vote
+      # CHANGE 1: Target the final_production stage for the vote app
+      target: final_production
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"] # Note: curl might not be in final_production image
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    volumes:
+      # This volume mount will override the contents of /usr/local/app
+      # with your host's ./vote directory. This is fine for local development
+      # but in a true production scenario, you'd typically bake the app code
+      # directly into the image in the final stage without a volume mount.
+      - ./vote:/usr/local/app
+    ports:
+      - "8080:80"
+    networks:
+      - front-tier
+      - back-tier
 
-# Switch to root user to install system packages with apk
-USER root
-# Install build-time dependencies and your application's requirements.
-# Use 'apk' for system packages (like curl, if truly needed for a script here)
-# and 'pip' for Python packages.
-RUN apk update && \
-    apk add --no-cache curl && \
-    rm -rf /var/cache/apk/*
+  result:
+    build: ./result
+    # use nodemon rather than node for local dev
+    entrypoint: nodemon --inspect=0.0.0.0 server.js
+    depends_on:
+      db:
+        condition: service_healthy
+      # CHANGE 2: Add dependency on worker to ensure DB schema is created
+      worker:
+        condition: service_started # Wait for worker to start, assuming it creates the table on startup
+    volumes:
+      - ./result:/usr/local/app
+    ports:
+      - "8081:80"
+      - "127.0.0.1:9229:9229"
+    networks:
+      - front-tier
+      - back-tier
 
-# It's good practice to switch back to a non-root user if one exists in the base image
-# and subsequent commands don't require root. For Chainguard images, a common
-# non-root user or UID might be 'nonroot' or '65532'. However, for simplicity
-# in this builder stage, and since pip install often works as root, we can proceed
-# without explicitly changing back here. The important part is that the final image
-# will inherently run as a non-root user unless you explicitly set it to root.
+  worker:
+    build:
+      context: ./worker
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    networks:
+      - back-tier
 
-# Copy requirements and install them
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+  redis:
+    image: redis:alpine
+    volumes:
+      - "./healthchecks:/healthchecks"
+    healthcheck:
+      test: /healthchecks/redis.sh
+      interval: "5s"
+    networks:
+      - back-tier
 
-# Copy the rest of your application code to the builder stage
-COPY . .
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+    volumes:
+      - "db-data:/var/lib/postgresql/data"
+      - "./healthchecks:/healthchecks"
+      # IMPORTANT: If your original app had SQL init scripts, they would go here.
+      # For example: - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      # However, the example-voting-app relies on the worker to create the table.
+    healthcheck:
+      test: /healthchecks/postgres.sh
+      interval: "5s"
+    networks:
+      - back-tier
 
-# --- Stage 2: Final Production Image ---
-# This stage uses the *truly minimal*, shell-less Chainguard Python runtime.
-# It only copies the essential artifacts from the 'builder' stage.
-FROM cgr.dev/chainguard/python:latest AS final_production
+  # this service runs once to seed the database with votes
+  # it won't run unless you specify the "seed" profile
+  # docker compose --profile seed up -d
+  seed:
+    build: ./seed-data
+    profiles: ["seed"]
+    depends_on:
+      vote:
+        condition: service_healthy
+    networks:
+      - front-tier
+    restart: "no"
 
-# Set the application directory in the final stage
-WORKDIR /usr/local/app
+volumes:
+  db-data:
 
-# Copy only the installed Python packages from the builder stage.
-# The path for site-packages in Chainguard Python images is typically /usr/lib/pythonX.Y/site-packages.
-# Adjust the 'python3.12' part if your Python version is different.
-COPY --from=builder /usr/lib/python3.12/site-packages /usr/lib/python3.12/site-packages
-
-# Copy your application source code from the builder stage
-COPY --from=builder /usr/local/app .
-
-# Make port 80 available for links and/or publish
-EXPOSE 80
-
-# Healthcheck Consideration:
-# For production, it's best to avoid tools like 'curl' inside the final image
-# to keep it minimal. If you need a healthcheck, consider:
-# 1. Using a Python-based healthcheck (as the Python runtime is available).
-#    Example (add this HEALTHCHECK line if needed, adapt to your actual health endpoint):
-#    HEALTHCHECK --interval=30s --timeout=3s \
-#      CMD python -c "import http.client; try: conn = http.client.HTTPConnection('localhost', 80); conn.request('GET', '/healthz'); r = conn.getresponse(); exit(0 if r.status == 200 else 1); except Exception: exit(1)"
-# 2. Implementing health checks externally (e.g., in your Docker Compose file
-#    or Kubernetes deployment definition), which is often more robust for minimal images.
-
-# Define our command to be run when launching the container
-CMD ["gunicorn", "app:app", "-b", "0.0.0.0:80", "--log-file", "-", "--access-logfile", "-", "--workers", "4", "--keep-alive", "0"]
-
-# --- Stage 3 (Optional): Development Image ---
-# If you still want a 'dev' image for local development, it should be based
-# on the 'builder' stage (or a specific dev image) but is NOT used as a base
-# for your 'final_production' image. This keeps your dev environment separate.
-FROM builder AS dev
-RUN pip install watchdog
-ENV FLASK_ENV=development
-CMD ["python", "app.py"]
+networks:
+  front-tier:
+  back-tier:
