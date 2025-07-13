@@ -2,7 +2,7 @@
 
 # build compiles the program for the builder's local platform
 # Change to Chainguard .NET SDK image, using the :latest tag
-FROM cgr.dev/chainguard/dotnet-sdk:latest AS build # <--- UPDATED LINE
+FROM cgr.dev/chainguard/dotnet-sdk:latest AS build
 ARG TARGETPLATFORM
 ARG TARGETARCH
 ARG BUILDPLATFORM
@@ -17,7 +17,7 @@ RUN dotnet publish -c release -o /app -a $TARGETARCH --self-contained false --no
 
 # app image
 # Change to Chainguard .NET Runtime image, using the :latest tag
-FROM cgr.dev/chainguard/dotnet-runtime:latest # <--- UPDATED LINE
+FROM cgr.dev/chainguard/dotnet-runtime:latest
 WORKDIR /app
 COPY --from=build /app .
 ENTRYPOINT ["dotnet", "Worker.dll"]
