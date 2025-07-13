@@ -9,11 +9,11 @@ ARG BUILDPLATFORM
 
 WORKDIR /source
 COPY *.csproj .
-# Changed to exec form:
-RUN ["dotnet", "restore", "-a", "$TARGETARCH"]
+# Modified: Removed "-a", "$TARGETARCH" from dotnet restore
+RUN ["dotnet", "restore"]
 
 COPY . .
-# Changed to exec form:
+# Changed to exec form (this was already done in previous step, confirming it's correct):
 RUN ["dotnet", "publish", "-c", "release", "-o", "/app", "-a", "$TARGETARCH", "--self-contained", "false", "--no-restore"]
 
 # --- Stage 2: App Image (Final Production Image) ---
