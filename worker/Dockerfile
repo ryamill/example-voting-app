@@ -13,6 +13,8 @@ COPY *.csproj .
 RUN ["dotnet", "restore"]
 
 COPY . .
+# Added USER root before publish to grant write permissions
+USER root
 # Modified: Removed "-a", "$TARGETARCH" from dotnet publish
 RUN ["dotnet", "publish", "-c", "release", "-o", "/app", "--self-contained", "false", "--no-restore"]
 
