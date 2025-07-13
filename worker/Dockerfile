@@ -10,7 +10,7 @@ ARG BUILDPLATFORM
 
 WORKDIR /source
 COPY *.csproj .
-RUN dotnet restore -a $TARGETARCH
+RUN ["dotnet", "restore", "-a", "$TARGETARCH"]
 
 COPY . .
 RUN ["dotnet", "publish", "-c", "release", "-o", "/app", "-a", "$TARGETARCH", "--self-contained", "false", "--no-restore"]
