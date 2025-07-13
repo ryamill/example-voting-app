@@ -1,9 +1,8 @@
 # ... (rest of your comments) ...
 
 # build compiles the program for the builder's local platform
-# Change to Chainguard .NET SDK image
-# Removed --platform=${BUILDPLATFORM} from here to fix the parsing error
-FROM cgr.dev/chainguard/dotnet-sdk:7.0 AS build
+# Change to Chainguard .NET SDK image, using the :latest tag
+FROM cgr.dev/chainguard/dotnet-sdk:latest AS build # <--- UPDATED LINE
 ARG TARGETPLATFORM
 ARG TARGETARCH
 ARG BUILDPLATFORM
@@ -17,8 +16,8 @@ COPY . .
 RUN dotnet publish -c release -o /app -a $TARGETARCH --self-contained false --no-restore
 
 # app image
-# Removed --platform=${BUILDPLATFORM} from here (if it was implicitly there or if you add it)
-FROM cgr.dev/chainguard/dotnet-runtime:7.0
+# Change to Chainguard .NET Runtime image, using the :latest tag
+FROM cgr.dev/chainguard/dotnet-runtime:latest # <--- UPDATED LINE
 WORKDIR /app
 COPY --from=build /app .
 ENTRYPOINT ["dotnet", "Worker.dll"]
