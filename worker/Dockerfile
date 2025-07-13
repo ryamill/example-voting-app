@@ -13,7 +13,7 @@ COPY *.csproj .
 RUN dotnet restore -a $TARGETARCH
 
 COPY . .
-RUN dotnet publish -c release -o /app -a $TARGETARCH --self-contained false --no-restore
+RUN ["dotnet", "publish", "-c", "release", "-o", "/app", "-a", "$TARGETARCH", "--self-contained", "false", "--no-restore"]
 
 # app image
 # Change to Chainguard .NET Runtime image, using the :latest tag
