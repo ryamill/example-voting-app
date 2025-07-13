@@ -6,7 +6,7 @@ FROM cgr.dev/chainguard/dotnet-sdk:latest AS build
 ARG TARGETPLATFORM
 ARG TARGETARCH
 ARG BUILDPLATFORM
-RUN /bin/bash -c "echo \"I am running on $BUILDPLATFORM, building for $TARGETPLATFORM\""
+>>> RUN ["/bin/bash", "-c", "echo \"I am running on $BUILDPLATFORM, building for $TARGETPLATFORM\""]
 
 WORKDIR /source
 COPY *.csproj .
