@@ -9,12 +9,12 @@ ARG BUILDPLATFORM
 
 WORKDIR /source
 COPY *.csproj .
-# Modified: Removed "-a", "$TARGETARCH" from dotnet restore
+# Already modified: Removed "-a", "$TARGETARCH" from dotnet restore
 RUN ["dotnet", "restore"]
 
 COPY . .
-# Changed to exec form (this was already done in previous step, confirming it's correct):
-RUN ["dotnet", "publish", "-c", "release", "-o", "/app", "-a", "$TARGETARCH", "--self-contained", "false", "--no-restore"]
+# Modified: Removed "-a", "$TARGETARCH" from dotnet publish
+RUN ["dotnet", "publish", "-c", "release", "-o", "/app", "--self-contained", "false", "--no-restore"]
 
 # --- Stage 2: App Image (Final Production Image) ---
 # This stage uses the minimal Chainguard .NET Runtime image.
