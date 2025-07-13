@@ -10,10 +10,12 @@ ARG BUILDPLATFORM
 
 WORKDIR /source
 COPY *.csproj .
-RUN ["dotnet", "restore", "-a", "$TARGETARCH"]
+# Modified line 13: Remove '-a "$TARGETARCH"'
+RUN ["dotnet", "restore"]
 
 COPY . .
-RUN ["dotnet", "publish", "-c", "release", "-o", "/app", "-a", "$TARGETARCH", "--self-contained", "false", "--no-restore"]
+# Modified line 16: Use '--use-current-runtime' instead of '-a "$TARGETARCH"'
+RUN ["dotnet", "publish", "-c", "release", "-o", "/app", "--use-current-runtime", "--self-contained", "false", "--no-restore"]
 
 # app image
 # Change to Chainguard .NET Runtime image, using the :latest tag
