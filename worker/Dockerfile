@@ -10,11 +10,11 @@ ARG BUILDPLATFORM
 
 WORKDIR /source
 COPY *.csproj .
-# Modified line 13: Remove '-a "$TARGETARCH"'
-RUN ["dotnet", "restore"]
+# MODIFIED: Tell dotnet restore to also target linux-x64 runtime
+RUN ["dotnet", "restore", "-r", "linux-x64"]
 
 COPY . .
-# Modified line 16: Use '--use-current-runtime' instead of '-a "$TARGETARCH"'
+# This line remains correct for publishing for the current runtime (linux-x64)
 RUN ["dotnet", "publish", "-c", "release", "-o", "/app", "--use-current-runtime", "--self-contained", "false", "--no-restore"]
 
 # app image
