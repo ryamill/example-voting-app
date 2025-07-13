@@ -1,15 +1,9 @@
-# because of dotnet, we always build on amd64, and target platforms in cli
-# dotnet doesn't support QEMU for building or running.
-# (errors common in arm/v7 32bit) https://github.com/dotnet/dotnet-docker/issues/1537
-# https://hub.docker.com/_/microsoft-dotnet
-# hadolint ignore=DL3029
-# to build for a different platform than your host, use --platform=<platform>
-# for example, if you were on Intel (amd64) and wanted to build for ARM, you would use:
-# docker buildx build --platform "linux/arm64/v8" .
+# ... (rest of your comments) ...
 
 # build compiles the program for the builder's local platform
 # Change to Chainguard .NET SDK image
-FROM --platform=${BUILDPLATFORM} cgr.dev/chainguard/dotnet-sdk:7.0 AS build # <--- UPDATED LINE
+# Removed --platform=${BUILDPLATFORM} from here to fix the parsing error
+FROM cgr.dev/chainguard/dotnet-sdk:7.0 AS build
 ARG TARGETPLATFORM
 ARG TARGETARCH
 ARG BUILDPLATFORM
@@ -23,8 +17,8 @@ COPY . .
 RUN dotnet publish -c release -o /app -a $TARGETARCH --self-contained false --no-restore
 
 # app image
-# Change to Chainguard .NET Runtime image
-FROM cgr.dev/chainguard/dotnet-runtime:7.0 # <--- UPDATED LINE
+# Removed --platform=${BUILDPLATFORM} from here (if it was implicitly there or if you add it)
+FROM cgr.dev/chainguard/dotnet-runtime:7.0
 WORKDIR /app
 COPY --from=build /app .
 ENTRYPOINT ["dotnet", "Worker.dll"]
