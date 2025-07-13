@@ -5,14 +5,16 @@ FROM --platform=${BUILDPLATFORM} cgr.dev/chainguard/dotnet-sdk:latest AS build
 ARG TARGETPLATFORM
 ARG TARGETARCH
 ARG BUILDPLATFORM
-RUN echo "I am running on $BUILDPLATFORM, building for $TARGETPLATFORM"
+# Removed: RUN echo "I am running on $BUILDPLATFORM, building for $TARGETPLATFORM"
 
 WORKDIR /source
 COPY *.csproj .
-RUN dotnet restore -a $TARGETARCH
+# Changed to exec form:
+RUN ["dotnet", "restore", "-a", "$TARGETARCH"]
 
 COPY . .
-RUN dotnet publish -c release -o /app -a $TARGETARCH --self-contained false --no-restore
+# Changed to exec form:
+RUN ["dotnet", "publish", "-c", "release", "-o", "/app", "-a", "$TARGETARCH", "--self-contained", "false", "--no-restore"]
 
 # --- Stage 2: App Image (Final Production Image) ---
 # This stage uses the minimal Chainguard .NET Runtime image.
